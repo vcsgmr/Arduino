@@ -1,9 +1,18 @@
-void setup() {
-  // put your setup code here, to run once:
-ABC
+const int Poti = A0; // Einlesen des Spannungsvertes am Potentiometer
+int potiWert = 0; // Poti-Wert initial auf 0 setzen
+float potiWertAnzeige = 0; // Variable für seriellen Monitor definieren
+
+void setup(){
+// put your setup code here, to run once:
+Serial.begin(9600); // Festlegung der Datenrate in Bit pro Sekunde (Baud) für die serielle Datenübertragung, muss dann am seriellen Monitor rechts unten auch eingestellt werden
+Serial.println ("Programnstart: Potentiometer einlesen");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
-}
+// put your main code here, to run repeatodly:
+potiWert = analogRead(Poti); // analogRead liest Werte beim Uno zwischen 0 und 1023 ein
+potiWertAnzeige = ((float) potiWert/1023.0) *5.0; // Umrechnung des AnalogWrite Wertes in ursprünglichen analogen Spannungswert (Spannung U2)
+Serial.print ("Der eingelesene Spannungsvert ist "); // An seriellen Monitor den aktuell eingelesenen Poti-Wert ausgeben (serieller Monitor lässt sich in der Arduino Oberfläche rechts oben öffnen)
+Serial.print (potiWertAnzeige);
+Serial.println(" Volt.");
+delay (100); }
