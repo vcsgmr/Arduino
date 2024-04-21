@@ -3,41 +3,40 @@
 const int Poti = A0; // Einlesen des Spannungsvertes am Potentiometer
 int potiWert = 0; // Poti-Wert initial auf 0 setzen
 float potiWertAnzeige = 0; // Variable für seriellen Monitor definieren
-float poti_03 = 0;
+float poti_03 = 0; //Variable für LED Helligkeit Einteilung
 
 int LEDrot = 2;// Festlegen der Variablen
 int LEDgruen = 3;
 int LEDblau = 4;                                                                              
-int SensorWert = 0;   //Sensorwert vom Joystick...kann Werte von 0...1023 annehmen. In Ruhelage des Joystick haben die x, y Achse jeweils den 
-// den Wert von 512
+
 int Helligkeit; //Initialisierung der Helligkeits-Variable
 
+
 void setup(){
-// put your setup code here, to run once:
-Serial.begin(9600); // Festlegung der Datenrate in Bit pro Sekunde (Baud) für die serielle Datenübertragung, muss dann am seriellen Monitor rechts unten auch eingestellt werden
-Serial.println ("Programnstart: Potentiometer einlesen");
-pinMode(LEDrot, OUTPUT);   // Definieren der LEDs
-pinMode(LEDgruen, OUTPUT);
-pinMode(LEDblau, OUTPUT);
+  Serial.begin(9600); // Festlegung der Datenrate in Bit pro Sekunde (Baud) für die serielle Datenübertragung, muss dann am seriellen Monitor rechts unten auch eingestellt werden
+  
+  pinMode(LEDrot, OUTPUT); // Definieren der LEDs
+  pinMode(LEDgruen, OUTPUT);
+  pinMode(LEDblau, OUTPUT);
+
+  //-------------------------------------
+
+  my_lcd.Init_LCD();
+  my_lcd.Fill_Screen(0x0);
+  show_main_menu();  //Führe die Funktion "show_main_menu" einmalig aus
+
 }
 
 void loop() {
-  // put your main code here, to run repeatodly:
   potiWert = analogRead(Poti); // analogRead liest Werte beim Uno zwischen 0 und 1023 ein
   potiWertAnzeige = ((float) potiWert/1023.0) *5.0; // Umrechnung des AnalogWrite Wertes in ursprünglichen analogen Spannungswert (Spannung U2)
-  /*
-  Serial.print ("Der eingelesene Spannungsvert ist "); // An seriellen Monitor den aktuell eingelesenen Poti-Wert ausgeben (serieller Monitor lässt sich in der Arduino Oberfläche rechts oben öffnen)
-  Serial.print (potiWertAnzeige);
-  Serial.println(" Volt.");
-  delay (100);
-  */
 
-  poti_03= potiWertAnzeige*3/5*M_PI;         //Umrechnung potential 
+  poti_03= potiWertAnzeige*3/5*M_PI; //Umrechnung potential in Wertebreich zwischen 0 - PI
 
   if (poti_03 <= M_PI){     
     digitalWrite(LEDblau, LOW);
-    digitalWrite(LEDrot, LOW);
-    analogWrite(LEDgruen, sin(poti_03)*255); //0-255-0     
+    digitalWrite(LEDrot, LOW); //Anderen LEDs aus
+    analogWrite(LEDgruen, sin(poti_03)*255); //Helligkeit in sin Kurve (0-255-0)
   }
   else if (poti_03 <= 2 * M_PI){
     digitalWrite(LEDgruen, LOW);
@@ -50,4 +49,8 @@ void loop() {
     digitalWrite(LEDblau, LOW);
     analogWrite(LEDrot, sin(poti_03)*255);
   }
+
+  //-------------------------------------
+
+
 }
