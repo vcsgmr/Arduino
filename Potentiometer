@@ -1,18 +1,61 @@
-//#define PI 3.1415926535897932384626433832795;
+#include <TouchScreen.h> //touch library
+#include <LCDWIKI_GUI.h> //Core graphics library
+#include <LCDWIKI_KBV.h> //Hardware-specific library
+//#include <LiquidCrystal.h>
 
-const int Poti = A0; // Einlesen des Spannungsvertes am Potentiometer
+LCDWIKI_KBV my_lcd(NV3029C,A3,A2,A1,A0,A4);
+
+#define YP A3  // must be an analog pin, use "An" notation!
+#define XM A2  // must be an analog pin, use "An" notation!
+#define YM 9   // can be a digital pin
+#define XP 8   // can be a digital pin
+
+#define TS_MINX 908
+#define TS_MAXX 120
+
+#define TS_MINY 147
+#define TS_MAXY 945
+
+#define BLACK   0x0000
+#define BLUE    0x001F
+#define RED     0xF800
+#define GREEN   0x07E0
+#define CYAN    0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW  0xFFE0
+#define WHITE   0xFFFF
+
+const int Poti = A7; // Einlesen des Spannungsvertes am Potentiometer
 int potiWert = 0; // Poti-Wert initial auf 0 setzen
 float potiWertAnzeige = 0; // Variable für seriellen Monitor definieren
 float poti_03 = 0; //Variable für LED Helligkeit Einteilung
 
-int LEDrot = 2;// Festlegen der Variablen
-int LEDgruen = 3;
-int LEDblau = 4;                                                                              
+int LEDrot = 49;// Festlegen der Variablen
+int LEDgruen = 51;
+int LEDblau = 53;
 
-int Helligkeit; //Initialisierung der Helligkeits-Variable
+int koord_h = my_lcd.Get_Display_Width()-82;
+int koord_b = my_lcd.Get_Display_Height()-80;
 
+int breite = 31;
+int breite_loeschung = 51;
+
+//temporarily holds data from vals
+char poti_char[10];   
+
+void show_string(uint8_t *str, int16_t x, int16_t y, uint8_t csize, uint16_t fc, uint16_t bc, boolean mode)
+{
+  my_lcd.Set_Text_Mode(mode);
+  my_lcd.Set_Text_Size(csize);
+  my_lcd.Set_Text_colour(fc);
+  my_lcd.Set_Text_Back_colour(bc);
+  my_lcd.Set_Rotation(1);  //
+  my_lcd.Print_String(str, y, x);
+  my_lcd.Set_Rotation(0);  
+}
 
 void setup(){
+  
   Serial.begin(9600); // Festlegung der Datenrate in Bit pro Sekunde (Baud) für die serielle Datenübertragung, muss dann am seriellen Monitor rechts unten auch eingestellt werden
   
   pinMode(LEDrot, OUTPUT); // Definieren der LEDs
@@ -23,31 +66,85 @@ void setup(){
 
   my_lcd.Init_LCD();
   my_lcd.Fill_Screen(0x0);
-  show_main_menu();  //Führe die Funktion "show_main_menu" einmalig aus
 
+  show_string("Poti: ", 20, 100, 2, WHITE, BLACK, 1);
+  show_string("V", 20, 235, 2, WHITE, BLACK, 1);
+
+
+  //Koordinatensystem
+
+  my_lcd.Set_Draw_color(255, 255, 255); 
+  my_lcd.Draw_Fast_VLine(10, 30, koord_b);  //Horizontal
+  my_lcd.Draw_Fast_HLine(10, 30, koord_h+20);  //Vertikal
+
+  // Achsenbeschriftung
+  my_lcd.Draw_Fast_VLine(42, 26, 4); //(x,y,breite)
+  my_lcd.Draw_Fast_VLine(74, 26, 4);
+  my_lcd.Draw_Fast_VLine(105, 26, 4);
+  my_lcd.Draw_Fast_VLine(137, 26, 4);
+  my_lcd.Draw_Fast_VLine(168, 26, 4);
+
+  show_string("1", my_lcd.Get_Display_Width()-51, 7, 2, WHITE, BLACK, 1);  // (...,höhe, breite, ...)
+  show_string("2", my_lcd.Get_Display_Width()-82, 7, 2, WHITE, BLACK, 1);
+  show_string("3", my_lcd.Get_Display_Width()-114, 7, 2, WHITE, BLACK, 1);
+  show_string("4", my_lcd.Get_Display_Width()-143, 7, 2, WHITE, BLACK, 1);
+  show_string("5", my_lcd.Get_Display_Width()-174, 7, 2, WHITE, BLACK, 1);
+
+  show_string("V", 27, 25, 2, WHITE, BLACK, 1);
+  show_string("t", my_lcd.Get_Display_Width()-20, 280, 2, WHITE, BLACK, 1);
 }
 
 void loop() {
+
+  pinMode(XM, OUTPUT); //notwendige Code-Zeilen für Ausgabe 
+  pinMode(YP, OUTPUT);
+
   potiWert = analogRead(Poti); // analogRead liest Werte beim Uno zwischen 0 und 1023 ein
-  potiWertAnzeige = ((float) potiWert/1023.0) *5.0; // Umrechnung des AnalogWrite Wertes in ursprünglichen analogen Spannungswert (Spannung U2)
+  potiWertAnzeige = ((float) potiWert/1023.0) *5.0; // Umrechnung des AnalogWrite Wertes in ursprünglichen analogen Spannungswert (Spannung U2)          
 
-  poti_03= potiWertAnzeige*3/5*M_PI; //Umrechnung potential in Wertebreich zwischen 0 - PI
+  //4 is mininum width, 3 is precision; float value is copied onto buff
+  dtostrf(potiWertAnzeige, 4, 3, poti_char);
+  my_lcd.Set_Draw_color(0, 0, 0);
+  //my_lcd.Fill_Screen(0x0);
+  my_lcd.Fill_Rectangle(my_lcd.Get_Display_Width()-17, 170, my_lcd.Get_Display_Width()-35, 230); // (Oben, links, unten, rechts)
+  show_string(poti_char, 20, 170, 2, WHITE, BLACK, 1);
 
+
+  my_lcd.Set_Draw_color(255, 0, 0);
+  my_lcd.Draw_Pixel(potiWertAnzeige/5*158+11, breite); // 5/5*158+21
+
+  my_lcd.Set_Draw_color(0, 0, 0);
+  my_lcd.Draw_Fast_HLine(11, breite_loeschung, koord_h);
+  breite ++;
+  breite_loeschung ++;
+  if (breite == koord_b+5){
+    breite = 31;
+  }
+  if (breite_loeschung == koord_b+5){
+    breite_loeschung = 31;
+  }
+  
+
+  //LED
+
+  poti_03 = potiWertAnzeige*3/5*M_PI; //Umrechnung potential in Wertebreich zwischen 0 - PI
+
+  
   if (poti_03 <= M_PI){     
     digitalWrite(LEDblau, LOW);
     digitalWrite(LEDrot, LOW); //Anderen LEDs aus
-    analogWrite(LEDgruen, sin(poti_03)*255); //Helligkeit in sin Kurve (0-255-0)
+    analogWrite(LEDgruen, 255); //sin(poti_03)*255); //Helligkeit in sin Kurve (0-255-0)
   }
   else if (poti_03 <= 2 * M_PI){
     digitalWrite(LEDgruen, LOW);
     digitalWrite(LEDrot, LOW);
-    analogWrite(LEDblau, -sin(poti_03)*255);
+    analogWrite(LEDblau, 255); //-sin(poti_03)*255
   }
 
   else if (poti_03 > 2 * M_PI){
     digitalWrite(LEDgruen, LOW);
     digitalWrite(LEDblau, LOW);
-    analogWrite(LEDrot, sin(poti_03)*255);
+    analogWrite(LEDrot, 255); // sin(poti_03)*255
   }
 
   //-------------------------------------
