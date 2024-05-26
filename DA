@@ -1,0 +1,71 @@
+#include <Arduino.h>
+
+// Definieren der Pflanzenarten
+enum PlantType {
+  TOMATO,
+  CANNABIS,
+  CUCUMBER,
+  PEPPER,
+  STRAWBERRY,
+  BASIL,
+  NUM_PLANTS
+};
+
+// Struktur zum Speichern der Pflanzenparameter
+struct PlantParameters {
+  float dayTemperature;
+  float nightTemperature;
+  float dayHumidity;
+  float nightHumidity;
+  int dayCO2;
+  int nightCO2;
+  int dayWater;
+  int nightWater;
+  int lightHours;
+};
+
+// Pflanzenparameter in einem Array speichern
+const PlantParameters plantData[NUM_PLANTS] = {
+  // {dayTemperature, nightTemperature, dayHumidity, nightHumidity, dayCO2, nightCO2, dayWater, nightWater, lightHours}
+  {22.0, 18.0, 60.0, 70.0, 1000, 400, 800, 200, 12}, // TOMATO
+  {24.0, 20.0, 40.0, 60.0, 1200, 400, 600, 100, 18}, // CANNABIS
+  {22.0, 18.0, 70.0, 80.0, 800, 400, 1000, 300, 12}, // CUCUMBER
+  {24.0, 18.0, 60.0, 70.0, 1000, 400, 700, 200, 12}, // PEPPER
+  {18.0, 12.0, 60.0, 80.0, 800, 400, 600, 100, 8},  // STRAWBERRY
+  {20.0, 16.0, 50.0, 60.0, 1000, 400, 400, 100, 12} // BASIL
+};
+
+// Funktion zur Auswahl der Pflanze
+PlantType selectPlant() {
+  // Hier könnte eine Logik zur Auswahl der Pflanze hinzugefügt werden, z.B. durch Benutzerinput
+  // Für das Beispiel wird TOMATO ausgewählt
+  return TOMATO;
+}
+
+void setup() {
+  // Initialisieren der seriellen Kommunikation
+  Serial.begin(9600);
+
+  // Ausgewählte Pflanze bestimmen
+  PlantType selectedPlant = selectPlant();
+
+  // Parameter der ausgewählten Pflanze auslesen
+  PlantParameters params = plantData[selectedPlant];
+
+  // Parameter ausgeben
+  Serial.println("Selected Plant Parameters:");
+  Serial.print("Day Temperature: "); Serial.println(params.dayTemperature);
+  Serial.print("Night Temperature: "); Serial.println(params.nightTemperature);
+  Serial.print("Day Humidity: "); Serial.println(params.dayHumidity);
+  Serial.print("Night Humidity: "); Serial.println(params.nightHumidity);
+  Serial.print("Day CO2: "); Serial.println(params.dayCO2);
+  Serial.print("Night CO2: "); Serial.println(params.nightCO2);
+  Serial.print("Day Water: "); Serial.println(params.dayWater);
+  Serial.print("Night Water: "); Serial.println(params.nightWater);
+  Serial.print("Light Hours: "); Serial.println(params.lightHours);
+}
+
+void loop() {
+  // Hauptlogik des Programms, die auf den ausgewählten Pflanzenparametern basiert
+  // Hier könnten z.B. Sensoren und Aktoren gesteuert werden, um die Bedingungen im Gewächshaus anzupassen
+}
