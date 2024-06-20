@@ -1,0 +1,571 @@
+/* 
+ To Do
+
+✅  String reihenfolge
+✅  Back communication 
+✅  Automation
+✅  Dashboard
+🔳  Präsi
+🔳  Präsi 2
+🔳  Prototyp (Pumpe, Parfum, Gerüst)
+
+
+Software:
+
+Sensor daten timen?
+Pflanzen Größe
+
+*/
+
+
+#include "thingProperties.h"
+#include <Wire.h>
+#include <millisDelay.h>
+#include <RTCZero.h>
+
+// Allg.
+
+RTCZero timer;
+bool day = false;
+millisDelay bootupTimer;
+bool firstMessage = false;
+int count = 0;
+bool send = false;
+int timerTime1 = 4;
+int timerTime2 = 18;
+
+// pump
+
+float waterOld = 0;
+int pumpTimeCalc;
+millisDelay pumpTimer;
+unsigned long pumpAutoTime;
+bool pumpAuto;
+float flowRate = 20; //50/60; // ml/s
+
+// light & led
+
+String lightStr;
+int onLightThreshold = 1500;
+int offLightThreshold = 3000;
+unsigned long ledStartTime = 0;
+bool ledAuto;
+
+// humidity und hudifi
+
+String humidityStatusOld;
+String humidityStr;
+int humidDiff;
+bool hudifiAuto;
+millisDelay hudifiTimer;
+
+// temperature
+
+String temperatureStatusOld;
+int tempDiff;
+String temperatureStr;
+
+//communication
+
+int packetSize = 4;
+unsigned long connectionLostTime = 0;
+unsigned long connectionRestoredTime = 0;
+bool wasConnected = true;
+
+// plant parameters
+
+int dayTemperature;
+int nightTemperature;
+int dayHumidity;
+int nightHumidity;
+int dayWater;
+int lightHours;
+
+struct PlantParameters {
+  int dayTemperature;
+  int nightTemperature;
+  int dayHumidity;
+  int nightHumidity;
+  int dayWater;
+  int lightHours;
+};
+
+// Definieren der Pflanzenarten
+enum PlantType {
+  TOMATO,
+  CANNABIS,
+  CUCUMBER,
+  PEPPER,
+  STRAWBERRY,
+  BASIL,
+  NUM_PLANTS
+};
+
+PlantType selectedPlant = CANNABIS;
+
+const PlantParameters plantData[NUM_PLANTS] = {
+  // {dayTemperature, nightTemperature, dayHumidity, nightHumidity, dayWater, lightHours}
+  {22, 18, 60, 70, 800, 12}, // TOMATO
+  {24, 20, 40, 60, 600, 18}, // CANNABIS
+  {22, 18, 70, 80, 1000, 12}, // CUCUMBER
+  {24, 18, 60, 70, 700, 12}, // PEPPER
+  {18, 12, 60, 80, 600, 8},  // STRAWBERRY
+  {20, 16, 50, 60, 400, 12} // BASIL
+};
+
+
+void setup() {
+
+  Serial.begin(9600);
+  Wire.begin(); // I2C als Master initialisieren
+
+  //while (!Serial); // Warten, bis der serielle Monitor geöffnet ist
+  initProperties();
+
+  //ArduinoCloud.begin(ArduinoIoTPreferredConnection, false);
+  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+  setDebugMessageLevel(4);
+  ArduinoCloud.printDebugInfo();
+
+  while(!ArduinoCloud.connected()){
+      ArduinoCloud.update();
+      delay(500);
+  };
+
+  toggleHumidity = false;
+  toggleTemperature = false;
+
+  timer.begin();
+
+  if(timer.getHours() > timerTime1 && timer.getHours() < timerTime2){
+    day = true;
+  }
+  else day = false;
+
+  // 7 Uhr autoPump, autoLed, toogleDay
+  timer.setAlarmTime(timerTime1, 0, 0);
+  timer.enableAlarm(timer.MATCH_HHMMSS);
+  //timer.enableAlarm(timer.MATCH_SS);
+  timer.attachInterrupt(alarm7);
+
+  refreshParams();
+
+  //bootupTimer.start(10000);
+}
+
+void loop() {
+
+  ArduinoCloud.update();
+
+  //checkNetworkConnection();
+  
+  requestSensorData();
+  checkParams();
+
+  if (!firstMessage) cloudMessenger();
+
+  delay(1000);
+}
+
+////////// Main functions //////////
+
+void requestSensorData(){
+
+  temperatureStr = "";
+  lightStr = "";
+  humidityStr = "";
+
+  Wire.requestFrom(4, 16);
+
+  for (int i = 1; i<=16;i++){
+    if (i<=4) lightStr += (char) Wire.read();
+    if (i>4 && i<=8) humidityStr += (char) Wire.read();
+    if (i>8) temperatureStr += (char) Wire.read();
+  }
+
+  lightStr = removeCharFromString(lightStr, 'x');
+  humidityStr = removeCharFromString(humidityStr, 'x');
+  temperatureStr = removeCharFromString(temperatureStr, 'x');
+
+  light = lightStr.toInt();
+  if (!toggleHumidity) humidity = humidityStr.toInt();
+  if (!toggleTemperature) temperature = temperatureStr.toInt();
+}
+
+void checkParams(){
+  if (day){
+    tempDiff = dayTemperature - temperature;
+    humidDiff = nightHumidity - humidity;
+  }
+  else {
+    tempDiff = nightTemperature - temperature;
+    humidDiff = nightHumidity - humidity;
+  }
+
+  ////////// humidity //////////
+
+  humidityStatusOld = humidityStatus;
+
+  if (abs(humidDiff) <=2) humidityStatus = "optimal";
+  else if (abs(humidDiff) <= 5) humidityStatus = "gut";
+  else if (abs(humidDiff) <= 10){
+    if (humidDiff <0) humidityStatus = "+";
+    else humidityStatus = "-";
+  }
+  else {
+    if (humidDiff <0) {
+      humidityStatus = "+++";
+    }
+    else {
+      humidityStatus = "---";
+      if (hudifiAuto){
+        sendMega("2", 15);
+      }
+    }
+   if (humidityStatusOld != humidityStatus){
+      if (humidityStatus == "---") text = "WARNUNG! Luftfeuchtigkeit zu niedrig!";
+      else text = "WARNUNG! Luftfeuchtigkeit zu hoch!";
+      ArduinoCloud.update();
+    }
+  }
+
+  if (hudifiTimer.justFinished() ){
+    hudifi = 0;
+    onHudifiChange();
+    //sendMega("1",0);
+  }
+  else if (hudifiTimer.isRunning()) {
+    hudifiTime = hudifiTimer.remaining()/1000;
+  }
+
+  ////////// temperature //////////
+
+  temperatureStatusOld = temperatureStatus;
+
+  if (abs(tempDiff) <=1) temperatureStatus = "optimal";
+  else if (abs(tempDiff) <= 3) temperatureStatus = "gut";
+  else if (abs(tempDiff) <= 5){
+    if (tempDiff <0) temperatureStatus = "+";
+    else temperatureStatus = "-";
+  }
+  else {
+    if (tempDiff <0 ){
+      temperatureStatus = "+++";
+    }
+    else{
+      temperatureStatus = "---";
+    }
+    if (temperatureStatusOld != temperatureStatus){
+      if (temperatureStatus == "---") text = "WARNUNG! Temperatur zu niedrig!";
+      else text = "WARNUNG! Temperatur zu hoch!";
+      ArduinoCloud.update();
+    }
+  }
+  
+  ////////// led //////////
+
+  if (ledAuto){
+
+    unsigned long lightRunning = millis() - ledStartTime; // in ms
+    float lightRunningHours = lightRunning / (1000.0 * 60 * 60);
+    int lightHoursNeeded = floor(lightHours - lightRunningHours); 
+    int lightMinutesNeeded = floor((lightHours - lightRunningHours - lightHoursNeeded) * 60);
+
+    if (lightHoursNeeded >= 0){ 
+      if (lightMinutesNeeded == 0) lightStatus = String(lightHoursNeeded) + " h";
+      else if (lightMinutesNeeded > 9) lightStatus = String(lightHoursNeeded) + " h " + String(lightMinutesNeeded);
+      else lightStatus = String(lightHoursNeeded) + " h 0" + String(lightMinutesNeeded);
+      if (light < onLightThreshold){ // es ist dunkel
+        sendMega("0", 100);
+      }
+      else if (light > offLightThreshold){
+        sendMega("0", 0);
+      }
+    }
+    else {
+      lightStatus = "0 h";
+      sendMega("0", 0);
+    }
+  }
+
+  ////////// pump //////////
+
+  if (pumpTimer.justFinished() ){
+    if (pumpAuto){
+      sendMega("1", 0);
+      pumpTimer.stop();
+    }
+    else {
+    pump = 0;
+    onPumpChange();
+    }
+  }
+  else if (pumpTimer.isRunning()) {
+    pumpTime = pumpTimer.remaining()/1000;
+    water = ((pumpTimeCalc - (pumpTimer.remaining()/1000)) * 100 * flowRate /dayWater + waterOld);
+  }
+}
+
+void refreshParams(){
+  PlantParameters selectedPlantParams = plantData[selectedPlant];
+  dayTemperature = selectedPlantParams.dayTemperature;
+  nightTemperature = selectedPlantParams.nightTemperature;
+  dayHumidity = selectedPlantParams.dayHumidity;
+  nightHumidity = selectedPlantParams.nightHumidity;
+  dayWater = selectedPlantParams.dayWater;
+  lightHours = selectedPlantParams.lightHours;
+
+  pumpAutoTime = dayWater/2/flowRate*1000;  // (ml/pump) / (ml/s) = pumpTime in s // * 1000
+  water = 0;
+  waterOld = 0;
+}
+
+/*
+void checkNetworkConnection() {
+  if (ArduinoCloud.connected()) {
+    if (!wasConnected) {
+      // Verbindung wiederhergestellt
+      connectionRestoredTime = millis();
+      if (connectionLostTime > 0) {
+        unsigned long offlineDuration = (connectionRestoredTime - connectionLostTime)/(1000);
+      }
+      wasConnected = true;
+    }
+  }
+  else if (wasConnected) {
+    // Verbindung verloren
+    connectionLostTime = millis();
+    wasConnected = false;
+  }
+}
+*/
+
+void sendMega(String adress, int data ){
+  String packet;
+  packet = adress;
+  packet += fillX(String(data), packetSize);
+  Wire.beginTransmission(4); // transmit to device #4
+  Wire.write(packet.c_str());
+  Wire.endTransmission();
+}
+
+void alarm7(){
+  if (pumpAuto) autoPump();
+  ledStartTime = millis();
+  day = true;
+  Serial.println("Tag");
+  text = "zum Tag-Modus gewechselt";
+  ArduinoCloud.update();
+  timer.setAlarmTime(timerTime2, 0, 0); // 20 Uhr (Zeitverschiebung UTC-> CEST) autoPump, toogleDay 
+  timer.attachInterrupt(alarm20);
+}
+
+void alarm20(){
+  if (pumpAuto) autoPump();
+  day = false;
+  Serial.println("Nacht");
+  text = "zum Nacht-Modus gewechselt";
+  ArduinoCloud.update();
+  timer.setAlarmTime(timerTime1, 0, 0); // 6 Uhr 
+  timer.attachInterrupt(alarm7);
+}
+
+void autoPump(){
+  Serial.println("Pump timer ausgelöst");
+  sendMega("1", 1);
+  pumpTimeCalc = pumpAutoTime/1000;
+  waterOld = water;
+  pumpTimer.start(pumpAutoTime); 
+}
+
+
+////////// Cloud Dashboard //////////
+
+void cloudMessenger(){
+  count ++;
+  if (count == 10){
+    //Serial.println("->->->->->->->->-> ready to clear");
+    firstMessage = true;
+    text = PropertyActions::CLEAR;
+    ArduinoCloud.update();
+    text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL)";
+    ArduinoCloud.update();
+  }
+}
+
+void onTextChange()  {
+  
+  if (compare(text, "tomato")){
+    selectedPlant = TOMATO;
+    refreshParams();
+  }
+  else if (compare(text, "cannabis")) {
+    selectedPlant = CANNABIS;
+    refreshParams();
+    }
+  else if (compare(text, "cucumber")) {
+    selectedPlant = CUCUMBER;
+    refreshParams();
+  }
+  else if (compare(text, "pepper")) {
+    selectedPlant = PEPPER;
+    refreshParams();
+  }
+  else if (compare(text, "strawberry")) {
+    selectedPlant = STRAWBERRY;
+    refreshParams();
+  }
+  else if (compare(text, "basil")) {
+    selectedPlant = BASIL;
+    refreshParams();
+  }
+  else if (compare(text, "clear")) {
+    text = PropertyActions::CLEAR;
+    ArduinoCloud.update();
+    text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL)";
+    return;
+  }
+  else {
+    text = "bitte geben Sie eine der oben genannten Pflanzen an";
+    return;
+  }
+  ArduinoCloud.update();
+  text = "Ausgewählte Pflanze: " + plantString(selectedPlant);
+  ArduinoCloud.update();
+}
+
+void onPumpChange(){
+
+  if (pump == 2){
+    pumpAuto = true;
+    //Serial.println("Pump auto");
+  }
+  else {
+    pumpAuto = false;
+
+    if (pump == 0){
+      sendMega("1", 0);
+      pumpTimer.stop();
+      pumpTime = 0;
+      //Serial.println("Pump off");
+    }
+    else if (pump == 1){
+      if (pumpTime == 0) pumpTime = 10;
+      pumpTimeCalc = pumpTime;
+      waterOld = water;
+      pumpTimer.start(pumpTime*1000);
+      sendMega("1", 1);
+      //Serial.println("Pump on");
+    }
+  }
+}
+
+void onLedChange()  {
+  if (led == 2){
+    ledAuto = true;
+    //Serial.println("led auto");
+    if (ledStartTime == 0){
+      int startTimediff = 0;
+      if (timer.getHours() > timerTime1) startTimediff = (timer.getHours()-timerTime1) * 60 * 60 * 1000;
+      else startTimediff = (timer.getHours() + 24 -timerTime1) * 60 * 60 * 1000;
+      startTimediff += timer.getMinutes() * 60 * 1000;
+      startTimediff += timer.getSeconds() * 1000;
+      ledStartTime = millis() - startTimediff;
+    }
+  }
+  else{
+    ledAuto = false;
+    ledStartTime = 0;
+    lightStatus = "auto only";
+    if (led == 0){
+      sendMega("0", 0);
+      ledBrightness = 0;
+    }
+    else if (led == 1){
+      if (ledBrightness == 0) ledBrightness = 50;
+      sendMega("0", ledBrightness);
+    }
+  }
+}
+
+void onLedBrightnessChange(){
+  if (ledBrightness == 0) led = 0;
+  else led = 1;
+  onLedChange();
+}
+
+void onHudifiChange(){
+  hudifiAuto = false;
+  if (hudifi == 0){
+    sendMega("2", 0);
+    hudifiTimer.stop();
+    hudifiTime = 0;
+  }
+  else if (hudifi == 1){
+    if (hudifiTime == 0) hudifiTime = 10;
+    sendMega("2", hudifiTime);
+    hudifiTimer.start(hudifiTime*1000);
+  }
+  else if (hudifi == 2){
+    hudifiAuto = true;
+  }
+}
+
+void onPumpTimeChange(){}
+
+void onHudifiTimeChange(){}
+
+void onHumidityChange(){}
+
+void onToggleHumidityChange(){}
+
+void onToggleTemperatureChange(){}
+
+void onTemperatureChange(){}
+
+
+/////// help functions ///////
+
+String fillX(String data, int size){
+  String dataNew;
+  int xAmount = size - data.length();
+  for(int i = 1; i<= xAmount; i++){
+    dataNew += "x";
+  }
+  dataNew += data;
+  return dataNew;
+}
+
+String boolToString(bool b){
+  if (b) return "1";
+  else return "0";
+}
+
+String removeCharFromString(String inputString, char charToRemove) {
+    String result;
+    for (char c : inputString) {
+        if (c != charToRemove) {
+            result += c;
+        }
+    }
+    return result;
+}
+
+boolean compare(String text, String string){
+  text.replace(" ", "");
+  text.toLowerCase();
+  if(text == string) return true;
+  return false;
+}
+
+String plantString(PlantType selectedplant){
+  if (selectedplant == TOMATO) return "TOMATO";
+  else if (selectedplant == CANNABIS) return "CANNABIS";
+  else if (selectedplant == CUCUMBER) return "CUCUMBER";
+  else if (selectedplant == PEPPER) return "PEPPER";
+  else if (selectedplant == STRAWBERRY) return "STRAWBERRY";
+  else if (selectedplant == BASIL) return "BASIL";
+  else return "irgendwas ist hier falsch du Idiot";
+}
+
+
