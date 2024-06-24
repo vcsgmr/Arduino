@@ -5,7 +5,7 @@
 ✅  Back communication 
 ✅  Automation
 ✅  Dashboard
-🔳  Präsi
+✅  Präsi
 🔳  Präsi 2
 🔳  Prototyp (Pumpe, Parfum, Gerüst)
 
@@ -139,15 +139,17 @@ void setup() {
 
   if(timer.getHours() > timerTime1 && timer.getHours() < timerTime2){
     day = true;
+    timer.setAlarmTime(timerTime1, 0, 0);     // 7 Uhr autoPump, autoLed, toogleDay
+    timer.enableAlarm(timer.MATCH_HHMMSS);
+    timer.attachInterrupt(alarm7);
+
   }
-  else day = false;
-
-  // 7 Uhr autoPump, autoLed, toogleDay
-  timer.setAlarmTime(timerTime1, 0, 0);
-  timer.enableAlarm(timer.MATCH_HHMMSS);
-  //timer.enableAlarm(timer.MATCH_SS);
-  timer.attachInterrupt(alarm7);
-
+  else {
+    day = false;
+    timer.setAlarmTime(timerTime2, 0, 0);
+    timer.enableAlarm(timer.MATCH_HHMMSS);
+    timer.attachInterrupt(alarm20);
+  }
   refreshParams();
 
   //bootupTimer.start(10000);
@@ -370,6 +372,10 @@ void alarm20(){
   timer.attachInterrupt(alarm7);
 }
 
+void alarmPump(){
+  if (pumpAuto) autoPump();
+}
+
 void autoPump(){
   Serial.println("Pump timer ausgelöst");
   sendMega("1", 1);
@@ -523,6 +529,33 @@ void onToggleTemperatureChange(){}
 
 void onTemperatureChange(){}
 
+void onTimerSimChange(){
+  if (timerSimOn){
+    timer.setAlarmTime(0, timerSim, 0);
+    timer.enableAlarm(timer.MATCH_MMSS);
+    timer.attachInterrupt(alarmPump);
+  }
+}
+
+void onTimerSimOnChange(){
+  if (timerSimOn){
+    timer.setAlarmTime(0, timerSim, 0);
+    timer.enableAlarm(timer.MATCH_MMSS);
+    timer.attachInterrupt(alarmPump);
+  }
+  else{ 
+    if(day){
+    timer.setAlarmTime(timerTime2, 0, 0);
+    timer.enableAlarm(timer.MATCH_HHMMSS);
+    timer.attachInterrupt(alarm20);
+    }
+    else {
+      timer.setAlarmTime(timerTime1, 0, 0);
+      timer.enableAlarm(timer.MATCH_HHMMSS);
+      timer.attachInterrupt(alarm7);
+    }
+  }
+}
 
 /////// help functions ///////
 
