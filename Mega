@@ -17,6 +17,7 @@ millisDelay offsetTimer;
 int stepperTime;
 bool stopHudifi = false;
 bool startHudifi = false;
+bool startHudifi2 = false;
 
 int lightSensorPin = A14; // Photoresistor/Lichtsensor B30
 int relayPin = 47; // ALLNET 5V Relay Modul B02
@@ -53,6 +54,9 @@ void loop() {
   readDHTSensor();   // DHT11 Sensor auslesen und verarbeiten
   if (startHudifi){
     controlHudifi(stepperTime);
+  }
+  if (startHudifi2){
+    controlHudifi2();
   }
   delay(1000);   // Kurze Pause zwischen den Messungen
 }
@@ -91,46 +95,6 @@ void readDHTSensor() {
 }
 
 
-/////// devices ///////
-
-void controlRelay(int state) {
-  if (state == 0){
-      digitalWrite(relayPin, LOW);
-  }
-  else if (state == 1){
-      digitalWrite(relayPin, HIGH);
-  }
-  else if (state == 2){
-    // AUTOMATION
-  }
-  else {
-    Serial.print("/////////////// Relay data wrong! ///////////////");
-  }
-}
-
-void controlLED(int brightness){
-  brightness = map(brightness, 0, 100, 0, 255);
-  analogWrite(ledPin, brightness);
-}
-
-void controlHudifi(int t){
-  startHudifi = false; 
-  Serial.print("Hudifi timer: ");
-  Serial.println(t);
-  stepperTimer.start(t*1000);
-  while(!stepperTimer.justFinished() && !stopHudifi){
-    Motor.step(-SPU/3);
-    delay(100);
-    Motor.step(SPU/3);
-    delay(100);
-  }
-}
-void controlHufifi2(){
-  Motor.step(SPU/20);
-}
-  
-
-
 /////// communication ///////
 
 void requestEvent(){
@@ -165,9 +129,10 @@ void receiveEvent(){
           stepperTime = data;
         }
         break;
+
     case 3:
-            Serial.println("");
-            controlHufifi2();
+            Serial.println("Stepper received");
+            startHudifi2 = true;
             break;
 
     default:
@@ -175,6 +140,47 @@ void receiveEvent(){
   }
 }
 
+
+/////// devices ///////
+
+void controlRelay(int state) {
+  if (state == 0){
+      digitalWrite(relayPin, LOW);
+  }
+  else if (state == 1){
+      digitalWrite(relayPin, HIGH);
+  }
+  else if (state == 2){
+    // AUTOMATION
+  }
+  else {
+    Serial.print("/////////////// Relay data wrong! ///////////////");
+  }
+}
+
+void controlLED(int brightness){
+  brightness = map(brightness, 0, 100, 0, 255);
+  analogWrite(ledPin, brightness);
+}
+
+void controlHudifi(int t){
+  startHudifi = false; 
+  Serial.print("Hudifi timer: ");
+  Serial.println(t);
+  stepperTimer.start(t*1000);
+  while(!stepperTimer.justFinished() && !stopHudifi){
+    Motor.step(-SPU/3);
+    delay(100);
+    Motor.step(SPU/3);
+    delay(100);
+  }
+}
+void controlHudifi2(){
+  startHudifi2 = false;
+  Motor.step((int) (SPU/20));
+  Serial.println("Stepper initiated");
+}
+  
 
 /////// help functions ///////
 
