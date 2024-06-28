@@ -33,7 +33,7 @@ void setup() {
 
   Serial.begin(9600);   // Starten der seriellen Übertragung
 
-  Motor.setSpeed(5);
+  Motor.setSpeed(15);
 
   pinMode(lightSensorPin, INPUT);
   pinMode(relayPin, OUTPUT);
@@ -62,7 +62,7 @@ void loop() {
 
 void readLightSensor() {
   int rawValue = analogRead(lightSensorPin);
-  float lightV = rawValue * (5.0 / 1023) * 1000;
+  float lightV = rawValue * (5.0 / 1023) * 1000/50;
   light = (int) (lightV);
   float resistance = 10000 * (lightV / (5000.0 - lightV)); // 5V wenn dunkel 50mV hell Schwellenwert 2000mV
 
@@ -119,12 +119,16 @@ void controlHudifi(int t){
   Serial.println(t);
   stepperTimer.start(t*1000);
   while(!stepperTimer.justFinished() && !stopHudifi){
-    Motor.step(SPU/3);
-    delay(100);
     Motor.step(-SPU/3);
+    delay(100);
+    Motor.step(SPU/3);
     delay(100);
   }
 }
+void controlHufifi2(){
+  Motor.step(SPU/20);
+}
+  
 
 
 /////// communication ///////
@@ -161,6 +165,10 @@ void receiveEvent(){
           stepperTime = data;
         }
         break;
+    case 3:
+            Serial.println("");
+            controlHufifi2();
+            break;
 
     default:
         Serial.print("/////////////// WRONG ADRESS! ///////////////");
