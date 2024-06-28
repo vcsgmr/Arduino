@@ -46,8 +46,8 @@ float flowRate = 1.3075;//1.2962; // ml/s
 // light & led
 
 String lightStr;
-int onLightThreshold = 1500;
-int offLightThreshold = 3000;
+int onLightThreshold = 30;
+int offLightThreshold = 60;
 unsigned long ledStartTime = 0;
 bool ledAuto;
 
@@ -289,6 +289,7 @@ void checkParams(){
       sendMega("0", 0);
     }
   }
+  else lightStatus = String(lightHours) + " h";
 
   ////////// pump //////////
 
@@ -482,7 +483,7 @@ void onLedChange()  {
   else{
     ledAuto = false;
     ledStartTime = 0;
-    lightStatus = "auto only";
+    lightStatus = String(lightHours) + " h";
     if (led == 0){
       sendMega("0", 0);
       ledBrightness = 0;
@@ -517,8 +518,11 @@ void onHudifiChange(){
   }
 }
 
-void onStepperChange()  {
-  sendMega("3",1);
+void onStepperChange(){
+  if (stepper){
+    Serial.println("Stepper ausgelöst");
+    sendMega("3", 0);
+  }
 }
 
 void onPumpTimeChange(){}
