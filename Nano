@@ -41,7 +41,7 @@ int pumpTimeCalc;
 millisDelay pumpTimer;
 unsigned long pumpAutoTime;
 bool pumpAuto;
-float flowRate = 20; //50/60; // ml/s
+float flowRate = 1.3075;//1.2962; // ml/s
 
 // light & led
 
@@ -517,6 +517,10 @@ void onHudifiChange(){
   }
 }
 
+void onStepperChange()  {
+  sendMega("3",1);
+}
+
 void onPumpTimeChange(){}
 
 void onHudifiTimeChange(){}
@@ -600,5 +604,3 @@ String plantString(PlantType selectedplant){
   else if (selectedplant == BASIL) return "BASIL";
   else return "irgendwas ist hier falsch du Idiot";
 }
-
-
