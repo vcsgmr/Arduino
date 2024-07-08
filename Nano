@@ -78,7 +78,14 @@ int dayTemperature;
 int nightTemperature;
 int dayHumidity;
 int nightHumidity;
-int dayWater;
+int seedWater;
+int kidWater;
+int grownWater;
+int factor;
+int size;
+int sizeCM;
+int state = 0; 
+int waterDemand;
 int lightHours;
 
 struct PlantParameters {
@@ -86,7 +93,10 @@ struct PlantParameters {
   int nightTemperature;
   int dayHumidity;
   int nightHumidity;
-  int dayWater;
+  int seedWater;
+  int kidWater;
+  int grownWater;
+  int factor;
   int lightHours;
 };
 
@@ -104,13 +114,13 @@ enum PlantType {
 PlantType selectedPlant = CANNABIS;
 
 const PlantParameters plantData[NUM_PLANTS] = {
-  // {dayTemperature, nightTemperature, dayHumidity, nightHumidity, dayWater, lightHours}
-  {22, 18, 60, 70, 800, 12}, // TOMATO
-  {24, 20, 40, 60, 600, 18}, // CANNABIS
-  {22, 18, 70, 80, 1000, 12}, // CUCUMBER
-  {24, 18, 60, 70, 700, 12}, // PEPPER
-  {18, 12, 60, 80, 600, 8},  // STRAWBERRY
-  {20, 16, 50, 60, 400, 12} // BASIL
+  // {dayTemperature, nightTemperature, dayHumidity, nightHumidity, dayWater, dayWater, dayWater, factor, lightHours}
+  {22, 18, 60, 70, 200, 500, 800, 10, 12}, // TOMATO
+  {24, 20, 40, 60, 200, 600, 1150, 10, 18}, // CANNABIS
+  {22, 18, 70, 80, 250, 750, 1000, 10, 12}, // CUCUMBER
+  {24, 18, 60, 70, 50, 350, 650, 5, 12}, // PEPPER
+  {18, 12, 60, 80, 50, 300, 450, 5, 8},  // STRAWBERRY
+  {20, 16, 50, 60, 50, 200, 300, 5, 12} // BASIL
 };
 
 
@@ -305,7 +315,7 @@ void checkParams(){
   }
   else if (pumpTimer.isRunning()) {
     pumpTime = pumpTimer.remaining()/1000;
-    water = ((pumpTimeCalc - (pumpTimer.remaining()/1000)) * 100 * flowRate /dayWater + waterOld);
+    water = ((pumpTimeCalc - (pumpTimer.remaining()/1000)) * 100 * flowRate /waterDemand + waterOld);
   }
 }
 
@@ -315,10 +325,21 @@ void refreshParams(){
   nightTemperature = selectedPlantParams.nightTemperature;
   dayHumidity = selectedPlantParams.dayHumidity;
   nightHumidity = selectedPlantParams.nightHumidity;
-  dayWater = selectedPlantParams.dayWater;
   lightHours = selectedPlantParams.lightHours;
 
-  pumpAutoTime = dayWater/2/flowRate*1000;  // (ml/pump) / (ml/s) = pumpTime in s // * 1000
+  if (size == 0){
+    waterDemand = selectedPlantParams.seedWater;
+  }
+  else if (size == 1){
+    waterDemand = selectedPlantParams.kidWater;
+  }
+  else if (size == 2){
+    waterDemand = selectedPlantParams.grownWater;
+  }
+
+  waterDemand += selectedPlantParams.factor/1000 * sizeCM;
+
+  pumpAutoTime = waterDemand/2/flowRate*1000;  // (ml/pump) / (ml/s) = pumpTime in s // * 1000
   water = 0;
   waterOld = 0;
 }
@@ -402,43 +423,63 @@ void cloudMessenger(){
 
 void onTextChange()  {
   
-  if (compare(text, "tomato")){
-    selectedPlant = TOMATO;
-    refreshParams();
-  }
-  else if (compare(text, "cannabis")) {
-    selectedPlant = CANNABIS;
-    refreshParams();
+  if (state == 0){ 
+    if (compare(text, "tomato")){
+      selectedPlant = TOMATO;
     }
-  else if (compare(text, "cucumber")) {
-    selectedPlant = CUCUMBER;
-    refreshParams();
-  }
-  else if (compare(text, "pepper")) {
-    selectedPlant = PEPPER;
-    refreshParams();
-  }
-  else if (compare(text, "strawberry")) {
-    selectedPlant = STRAWBERRY;
-    refreshParams();
-  }
-  else if (compare(text, "basil")) {
-    selectedPlant = BASIL;
-    refreshParams();
-  }
-  else if (compare(text, "clear")) {
-    text = PropertyActions::CLEAR;
+    else if (compare(text, "cannabis")) {
+      selectedPlant = CANNABIS;
+      }
+    else if (compare(text, "cucumber")) {
+      selectedPlant = CUCUMBER;
+    }
+    else if (compare(text, "pepper")) {
+      selectedPlant = PEPPER;
+    }
+    else if (compare(text, "strawberry")) {
+      selectedPlant = STRAWBERRY;
+    }
+    else if (compare(text, "basil")) {
+      selectedPlant = BASIL;
+    }
+    else if (compare(text, "clear")) {
+      text = PropertyActions::CLEAR;
+      ArduinoCloud.update();
+      text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL)";
+      return;
+    }
+    else {
+      text = "bitte geben Sie eine der oben genannten Pflanzen an";
+      return;
+    }
     ArduinoCloud.update();
-    text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL)";
-    return;
+    text = "Ausgewählte Pflanze: " + plantString(selectedPlant);
+    ArduinoCloud.update();
+      text = "Ist die Pflanze ein Samling (1), eine Jungpflanze (2) oder ausgewachsen (3)?";
+    ArduinoCloud.update();
+    state = 1;
   }
-  else {
-    text = "bitte geben Sie eine der oben genannten Pflanzen an";
-    return;
+  else if (state == 1){
+    if (compare(text, "1")){
+      size = 1;
+      state = 0;
+      refreshParams();
+      return;
+    }
+    else if (compare(text, "2")) size = 2;
+    else if (compare(text, "3")) size = 3;
+    else {
+      text = "gebe 1,2 oder 3 an";
+      return;
+    }
+    text = "Gebe die Größe der Pflanze in cm an";
+    state = 2;
   }
-  ArduinoCloud.update();
-  text = "Ausgewählte Pflanze: " + plantString(selectedPlant);
-  ArduinoCloud.update();
+  else if (state == 2) {
+    sizeCM = text.toInt();
+    state = 0;
+    refreshParams();  
+  }
 }
 
 void onPumpChange(){
