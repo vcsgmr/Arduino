@@ -5,7 +5,7 @@
 #include <millisDelay.h>
 #include "DHT.h" // DHT11 Sensor
 
-#define DHTPIN 2
+#define DHTPIN 3
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -21,7 +21,7 @@ bool startHudifi2 = false;
 
 int lightSensorPin = A14; // Photoresistor/Lichtsensor B30
 int relayPin = 47; // ALLNET 5V Relay Modul B02
-int ledPin = 3;
+int ledPin = 2;
 
 int light;
 int humidity;
@@ -34,7 +34,7 @@ void setup() {
 
   Serial.begin(9600);   // Starten der seriellen Übertragung
 
-  Motor.setSpeed(15);
+  Motor.setSpeed(10);
 
   pinMode(lightSensorPin, INPUT);
   pinMode(relayPin, OUTPUT);
@@ -169,9 +169,9 @@ void controlHudifi(int t){
   Serial.println(t);
   stepperTimer.start(t*1000);
   while(!stepperTimer.justFinished() && !stopHudifi){
-    Motor.step(-SPU/3);
+    Motor.step(SPU/4);
     delay(100);
-    Motor.step(SPU/3);
+    Motor.step(-SPU/4);
     delay(100);
   }
 }
