@@ -41,7 +41,7 @@ int pumpTimeCalc;
 millisDelay pumpTimer;
 unsigned long pumpAutoTime;
 bool pumpAuto;
-float flowRate = 1.3075;//1.2962; // ml/s
+float flowRate = 1.0;//1.2962; // ml/s
 
 // light & led
 
@@ -108,6 +108,7 @@ enum PlantType {
   PEPPER,
   STRAWBERRY,
   BASIL,
+  GOLDBAUM,
   NUM_PLANTS
 };
 
@@ -120,7 +121,9 @@ const PlantParameters plantData[NUM_PLANTS] = {
   {22, 18, 70, 80, 250, 750, 1000, 10, 12}, // CUCUMBER
   {24, 18, 60, 70, 50, 350, 650, 5, 12}, // PEPPER
   {18, 12, 60, 80, 50, 300, 450, 5, 8},  // STRAWBERRY
-  {20, 16, 50, 60, 50, 200, 300, 5, 12} // BASIL
+  {20, 16, 50, 60, 50, 200, 300, 5, 12}, // BASIL
+  {24, 18, 60, 70, 10, 20, 30, 5,	24} //GOLDBAUM
+
 };
 
 
@@ -339,6 +342,9 @@ void refreshParams(){
 
   waterDemand += selectedPlantParams.factor/1000 * sizeCM;
 
+  Serial.println("Wasserbedarf");
+  Serial.println(waterDemand);
+
   pumpAutoTime = waterDemand/2/flowRate*1000;  // (ml/pump) / (ml/s) = pumpTime in s // * 1000
   water = 0;
   waterOld = 0;
@@ -406,6 +412,7 @@ void autoPump(){
   pumpTimer.start(pumpAutoTime); 
 }
 
+////////// Communication //////////
 
 ////////// Cloud Dashboard //////////
 
@@ -416,7 +423,7 @@ void cloudMessenger(){
     firstMessage = true;
     text = PropertyActions::CLEAR;
     ArduinoCloud.update();
-    text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL)";
+    text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL, GOLDBAUM)";
     ArduinoCloud.update();
   }
 }
@@ -430,6 +437,9 @@ void onTextChange()  {
     else if (compare(text, "cannabis")) {
       selectedPlant = CANNABIS;
       }
+    else if (compare(text, "goldbaum")) {
+      selectedPlant = GOLDBAUM;
+    }
     else if (compare(text, "cucumber")) {
       selectedPlant = CUCUMBER;
     }
@@ -445,7 +455,7 @@ void onTextChange()  {
     else if (compare(text, "clear")) {
       text = PropertyActions::CLEAR;
       ArduinoCloud.update();
-      text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL)";
+      text = "wähle deine Pflanze aus (TOMATO, CANNABIS, CUCUMBER, PEPPER, STRAWBERRY, BASIL, GOLDBAUM)";
       return;
     }
     else {
@@ -647,5 +657,6 @@ String plantString(PlantType selectedplant){
   else if (selectedplant == PEPPER) return "PEPPER";
   else if (selectedplant == STRAWBERRY) return "STRAWBERRY";
   else if (selectedplant == BASIL) return "BASIL";
+  else if (selectedplant == GOLDBAUM) return "GOLDBAUM";
   else return "irgendwas ist hier falsch du Idiot";
 }
