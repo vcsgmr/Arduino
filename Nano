@@ -6,14 +6,9 @@
 ✅  Automation
 ✅  Dashboard
 ✅  Präsi
-🔳  Präsi 2
-🔳  Prototyp (Pumpe, Parfum, Gerüst)
+✅  Präsi 2
+✅  Prototyp (Pumpe, Parfum, Gerüst)
 
-
-Software:
-
-Sensor daten timen?
-Pflanzen Größe
 
 */
 
@@ -155,7 +150,6 @@ void setup() {
     timer.setAlarmTime(timerTime1, 0, 0);     // 7 Uhr autoPump, autoLed, toogleDay
     timer.enableAlarm(timer.MATCH_HHMMSS);
     timer.attachInterrupt(alarm7);
-
   }
   else {
     day = false;
@@ -292,9 +286,11 @@ void checkParams(){
       else lightStatus = String(lightHoursNeeded) + " h 0" + String(lightMinutesNeeded);
       if (light < onLightThreshold){ // es ist dunkel
         sendMega("0", 100);
+        ledBrightness = 100;
       }
       else if (light > offLightThreshold){
         sendMega("0", 0);
+        ledBrightness = 0;
       }
     }
     else {
@@ -330,19 +326,19 @@ void refreshParams(){
   nightHumidity = selectedPlantParams.nightHumidity;
   lightHours = selectedPlantParams.lightHours;
 
-  if (size == 0){
+  if (size == 1){
     waterDemand = selectedPlantParams.seedWater;
   }
-  else if (size == 1){
-    waterDemand = selectedPlantParams.kidWater;
-  }
   else if (size == 2){
+    waterDemand = selectedPlantParams.kidWater;
+    waterDemand += selectedPlantParams.factor * sizeCM;
+  }
+  else if (size == 3){
     waterDemand = selectedPlantParams.grownWater;
+    waterDemand += selectedPlantParams.factor * sizeCM;
   }
 
-  waterDemand += selectedPlantParams.factor/1000 * sizeCM;
-
-  Serial.println("Wasserbedarf");
+  Serial.print("Wasserbedarf: ");
   Serial.println(waterDemand);
 
   pumpAutoTime = waterDemand/2/flowRate*1000;  // (ml/pump) / (ml/s) = pumpTime in s // * 1000
@@ -409,7 +405,7 @@ void autoPump(){
   sendMega("1", 1);
   pumpTimeCalc = pumpAutoTime/1000;
   waterOld = water;
-  pumpTimer.start(pumpAutoTime); 
+  pumpTimer.start(pumpAutoTime);
 }
 
 ////////// Communication //////////
@@ -478,17 +474,30 @@ void onTextChange()  {
     }
     else if (compare(text, "2")) size = 2;
     else if (compare(text, "3")) size = 3;
+    else if (compare(text, "cancel")){
+      state = 0;
+      return;
+    }
     else {
       text = "gebe 1,2 oder 3 an";
       return;
     }
-    text = "Gebe die Größe der Pflanze in cm an";
+    text = "Geben Sie die Größe der Pflanze in cm an";
     state = 2;
   }
   else if (state == 2) {
+    if (compare(text, "cancel")){
+      state = 0;
+      return;
+    }
+    if (!is_number(text)){
+      text = "bitte gib eine Zahl ein";
+      return;
+    }
     sizeCM = text.toInt();
+    text = "die Growbox ist jetzt eingestellt";
     state = 0;
-    refreshParams();  
+    refreshParams();
   }
 }
 
@@ -547,6 +556,7 @@ void onLedChange()  {
 }
 
 void onLedBrightnessChange(){
+  if (ledAuto) return;
   if (ledBrightness == 0) led = 0;
   else led = 1;
   onLedChange();
@@ -593,6 +603,8 @@ void onTimerSimChange(){
     timer.setAlarmTime(0, timerSim, 0);
     timer.enableAlarm(timer.MATCH_MMSS);
     timer.attachInterrupt(alarmPump);
+    Serial.println("timer start");
+    pumpAuto = true;
   }
 }
 
@@ -601,6 +613,8 @@ void onTimerSimOnChange(){
     timer.setAlarmTime(0, timerSim, 0);
     timer.enableAlarm(timer.MATCH_MMSS);
     timer.attachInterrupt(alarmPump);
+    Serial.println("timer start");
+    pumpAuto = true;
   }
   else{ 
     if(day){
@@ -657,6 +671,24 @@ String plantString(PlantType selectedplant){
   else if (selectedplant == PEPPER) return "PEPPER";
   else if (selectedplant == STRAWBERRY) return "STRAWBERRY";
   else if (selectedplant == BASIL) return "BASIL";
-  else if (selectedplant == GOLDBAUM) return "GOLDBAUM";
   else return "irgendwas ist hier falsch du Idiot";
+}
+  
+bool is_number(String s){
+  char c;
+  for (int i=0; i<s.length(); i++){
+    c = s.charAt(i);
+    if (c == '0') continue;
+    else if (c == '1') continue;
+    else if (c == '2') continue;
+    else if (c == '3') continue;
+    else if (c == '4') continue;
+    else if (c == '5') continue;
+    else if (c == '6') continue;
+    else if (c == '7') continue;
+    else if (c == '8') continue;
+    else if (c == '9') continue;
+    else return false;
+  }
+  return true;
 }
