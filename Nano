@@ -9,9 +9,7 @@
 ✅  Präsi 2
 ✅  Prototyp (Pumpe, Parfum, Gerüst)
 
-
 */
-
 
 #include "thingProperties.h"
 #include <Wire.h>
@@ -178,28 +176,6 @@ void loop() {
 
 ////////// Main functions //////////
 
-void requestSensorData(){
-
-  temperatureStr = "";
-  lightStr = "";
-  humidityStr = "";
-
-  Wire.requestFrom(4, 16);
-
-  for (int i = 1; i<=16;i++){
-    if (i<=4) lightStr += (char) Wire.read();
-    if (i>4 && i<=8) humidityStr += (char) Wire.read();
-    if (i>8) temperatureStr += (char) Wire.read();
-  }
-
-  lightStr = removeCharFromString(lightStr, 'x');
-  humidityStr = removeCharFromString(humidityStr, 'x');
-  temperatureStr = removeCharFromString(temperatureStr, 'x');
-
-  light = lightStr.toInt();
-  if (!toggleHumidity) humidity = humidityStr.toInt();
-  if (!toggleTemperature) temperature = temperatureStr.toInt();
-}
 
 void checkParams(){
   if (day){
@@ -346,35 +322,6 @@ void refreshParams(){
   waterOld = 0;
 }
 
-/*
-void checkNetworkConnection() {
-  if (ArduinoCloud.connected()) {
-    if (!wasConnected) {
-      // Verbindung wiederhergestellt
-      connectionRestoredTime = millis();
-      if (connectionLostTime > 0) {
-        unsigned long offlineDuration = (connectionRestoredTime - connectionLostTime)/(1000);
-      }
-      wasConnected = true;
-    }
-  }
-  else if (wasConnected) {
-    // Verbindung verloren
-    connectionLostTime = millis();
-    wasConnected = false;
-  }
-}
-*/
-
-void sendMega(String adress, int data ){
-  String packet;
-  packet = adress;
-  packet += fillX(String(data), packetSize);
-  Wire.beginTransmission(4); // transmit to device #4
-  Wire.write(packet.c_str());
-  Wire.endTransmission();
-}
-
 void alarm7(){
   if (pumpAuto) autoPump();
   ledStartTime = millis();
@@ -408,7 +355,59 @@ void autoPump(){
   pumpTimer.start(pumpAutoTime);
 }
 
+/*
+void checkNetworkConnection() {
+  if (ArduinoCloud.connected()) {
+    if (!wasConnected) {
+      // Verbindung wiederhergestellt
+      connectionRestoredTime = millis();
+      if (connectionLostTime > 0) {
+        unsigned long offlineDuration = (connectionRestoredTime - connectionLostTime)/(1000);
+      }
+      wasConnected = true;
+    }
+  }
+  else if (wasConnected) {
+    // Verbindung verloren
+    connectionLostTime = millis();
+    wasConnected = false;
+  }
+}
+*/
+
 ////////// Communication //////////
+
+void requestSensorData(){
+
+  temperatureStr = "";
+  lightStr = "";
+  humidityStr = "";
+
+  Wire.requestFrom(4, 16);
+
+  for (int i = 1; i<=16;i++){
+    if (i<=4) lightStr += (char) Wire.read();
+    if (i>4 && i<=8) humidityStr += (char) Wire.read();
+    if (i>8) temperatureStr += (char) Wire.read();
+  }
+
+  lightStr = removeCharFromString(lightStr, 'x');
+  humidityStr = removeCharFromString(humidityStr, 'x');
+  temperatureStr = removeCharFromString(temperatureStr, 'x');
+
+  light = lightStr.toInt();
+  if (!toggleHumidity) humidity = humidityStr.toInt();
+  if (!toggleTemperature) temperature = temperatureStr.toInt();
+}
+
+void sendMega(String adress, int data ){
+  String packet;
+  packet = adress;
+  packet += fillX(String(data), packetSize);
+  Wire.beginTransmission(4); // transmit to device #4
+  Wire.write(packet.c_str());
+  Wire.endTransmission();
+}
 
 ////////// Cloud Dashboard //////////
 
@@ -527,6 +526,38 @@ void onPumpChange(){
   }
 }
 
+void onTimerSimChange(){
+  if (timerSimOn){
+    timer.setAlarmTime(0, timerSim, 0);
+    timer.enableAlarm(timer.MATCH_MMSS);
+    timer.attachInterrupt(alarmPump);
+    Serial.println("timer start");
+    pumpAuto = true;
+  }
+}
+
+void onTimerSimOnChange(){
+  if (timerSimOn){
+    timer.setAlarmTime(0, timerSim, 0);
+    timer.enableAlarm(timer.MATCH_MMSS);
+    timer.attachInterrupt(alarmPump);
+    Serial.println("timer start");
+    pumpAuto = true;
+  }
+  else{ 
+    if(day){
+    timer.setAlarmTime(timerTime2, 0, 0);
+    timer.enableAlarm(timer.MATCH_HHMMSS);
+    timer.attachInterrupt(alarm20);
+    }
+    else {
+      timer.setAlarmTime(timerTime1, 0, 0);
+      timer.enableAlarm(timer.MATCH_HHMMSS);
+      timer.attachInterrupt(alarm7);
+    }
+  }
+}
+
 void onLedChange()  {
   if (led == 2){
     ledAuto = true;
@@ -597,38 +628,6 @@ void onToggleHumidityChange(){}
 void onToggleTemperatureChange(){}
 
 void onTemperatureChange(){}
-
-void onTimerSimChange(){
-  if (timerSimOn){
-    timer.setAlarmTime(0, timerSim, 0);
-    timer.enableAlarm(timer.MATCH_MMSS);
-    timer.attachInterrupt(alarmPump);
-    Serial.println("timer start");
-    pumpAuto = true;
-  }
-}
-
-void onTimerSimOnChange(){
-  if (timerSimOn){
-    timer.setAlarmTime(0, timerSim, 0);
-    timer.enableAlarm(timer.MATCH_MMSS);
-    timer.attachInterrupt(alarmPump);
-    Serial.println("timer start");
-    pumpAuto = true;
-  }
-  else{ 
-    if(day){
-    timer.setAlarmTime(timerTime2, 0, 0);
-    timer.enableAlarm(timer.MATCH_HHMMSS);
-    timer.attachInterrupt(alarm20);
-    }
-    else {
-      timer.setAlarmTime(timerTime1, 0, 0);
-      timer.enableAlarm(timer.MATCH_HHMMSS);
-      timer.attachInterrupt(alarm7);
-    }
-  }
-}
 
 /////// help functions ///////
 
