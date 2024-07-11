@@ -423,7 +423,7 @@ void cloudMessenger(){
   }
 }
 
-void onTextChange()  {
+void onTextChange(){
   
   if (state == 0){ 
     if (compare(text, "tomato")){
@@ -560,6 +560,8 @@ void onTimerSimOnChange(){
 
 void onLedChange()  {
   if (led == 2){
+    sendMega("0", 0);
+    ledBrightness = 0;
     ledAuto = true;
     //Serial.println("led auto");
     if (ledStartTime == 0){
